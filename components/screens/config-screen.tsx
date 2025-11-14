@@ -2,14 +2,16 @@ import { Colors } from '@/constants/theme';
 import React from 'react';
 import { Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { GyroscopeConfig } from '../../hooks/use-gyroscope-controller';
+import { Ionicons } from '@expo/vector-icons';
 
 interface ConfigScreenProps {
   config: GyroscopeConfig;
   onConfigChange: (config: Partial<GyroscopeConfig>) => void;
   onActivate: () => void;
+  bluetoothConnected?: boolean;
 }
 
-export function ConfigScreen({ config, onConfigChange, onActivate }: ConfigScreenProps) {
+export function ConfigScreen({ config, onConfigChange, onActivate, bluetoothConnected = false }: ConfigScreenProps) {
   const handleNumberChange = (key: keyof GyroscopeConfig, value: string) => {
     const numValue = parseFloat(value);
     if (!isNaN(numValue)) {
@@ -25,6 +27,26 @@ export function ConfigScreen({ config, onConfigChange, onActivate }: ConfigScree
     >
       <Text style={styles.title}>Configuração do Controle</Text>
       <Text style={styles.subtitle}>Ajuste os parâmetros antes de ativar</Text>
+
+      {/* Bluetooth Status Banner */}
+      <View style={[
+        styles.bluetoothBanner,
+        bluetoothConnected ? styles.bluetoothConnected : styles.bluetoothDisconnected
+      ]}>
+        <Ionicons 
+          name={bluetoothConnected ? "bluetooth" : "bluetooth-outline"} 
+          size={20} 
+          color={bluetoothConnected ? Colors.light.success : Colors.light.textMuted} 
+        />
+        <Text style={[
+          styles.bluetoothText,
+          bluetoothConnected ? styles.bluetoothConnectedText : styles.bluetoothDisconnectedText
+        ]}>
+          {bluetoothConnected 
+            ? 'Bluetooth Conectado - Pronto para controlar' 
+            : 'Bluetooth Desconectado - Conecte na aba Início'}
+        </Text>
+      </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Sensibilidade</Text>
@@ -230,6 +252,35 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.light.backgroundCard,
     padding: 16,
     borderRadius: 8,
+  },
+  bluetoothBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    gap: 8,
+  },
+  bluetoothConnected: {
+    backgroundColor: '#e8f5e9',
+    borderWidth: 1,
+    borderColor: Colors.light.success,
+  },
+  bluetoothDisconnected: {
+    backgroundColor: '#fff3e0',
+    borderWidth: 1,
+    borderColor: '#ff9800',
+  },
+  bluetoothText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  bluetoothConnectedText: {
+    color: Colors.light.success,
+  },
+  bluetoothDisconnectedText: {
+    color: '#f57c00',
   },
 });
 

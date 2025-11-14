@@ -5,14 +5,23 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/theme';
 import { GyroscopeData } from '../../hooks/use-gyroscope-controller';
 import { calculateArrowRotation, getThrottleColor } from '../../utils/gyroscope';
+import { BluetoothStats } from '@/types/bluetooth';
 
 interface ControlScreenProps {
   data: GyroscopeData;
   onDeactivate: () => void;
   onCalibrateNeutral: () => void;
+  bluetoothConnected?: boolean;
+  bluetoothStats?: BluetoothStats;
 }
 
-export function ControlScreen({ data, onDeactivate, onCalibrateNeutral }: ControlScreenProps) {
+export function ControlScreen({ 
+  data, 
+  onDeactivate, 
+  onCalibrateNeutral, 
+  bluetoothConnected = false,
+  bluetoothStats 
+}: ControlScreenProps) {
   const { throttle, steeringAngle } = data;
   const insets = useSafeAreaInsets();
   const [showCalibrationModal, setShowCalibrationModal] = useState(true);
@@ -175,6 +184,27 @@ export function ControlScreen({ data, onDeactivate, onCalibrateNeutral }: Contro
             {steeringAngle}°
           </Text>
           <Text style={styles.statusDirection}>{steeringText}</Text>
+        </View>
+
+        {/* Bluetooth Status Card */}
+        <View style={[styles.statusCard, styles.bluetoothCard]}>
+          <Ionicons 
+            name={bluetoothConnected ? "bluetooth" : "bluetooth-outline"} 
+            size={24} 
+            color={bluetoothConnected ? Colors.light.success : Colors.light.textMuted} 
+          />
+          <Text style={styles.statusLabel}>Bluetooth</Text>
+          <Text style={[
+            styles.statusValue, 
+            { color: bluetoothConnected ? Colors.light.success : Colors.light.textMuted }
+          ]}>
+            {bluetoothConnected ? 'Ativo' : 'Off'}
+          </Text>
+          {bluetoothConnected && bluetoothStats && (
+            <Text style={styles.bluetoothStatsText}>
+              {bluetoothStats.commandsSent} cmds
+            </Text>
+          )}
         </View>
       </View>
     </View>
@@ -428,5 +458,14 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  bluetoothCard: {
+    minHeight: 120,
+    justifyContent: 'center',
+  },
+  bluetoothStatsText: {
+    fontSize: 11,
+    color: Colors.light.textSecondary,
+    marginTop: 4,
   },
 });

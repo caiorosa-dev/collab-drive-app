@@ -2,33 +2,61 @@ import { Colors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import React, { useState } from 'react';
-import { ActivityIndicator, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-type ConnectionStatus = 'disconnected' | 'scanning' | 'connecting' | 'connected';
+import { useBluetoothContext } from '@/contexts/bluetooth-context';
+import { StrippedDevice } from '@/types/bluetooth';
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
+  const { state, startScan, connect, disconnect } = useBluetoothContext();
+  const [showDeviceList, setShowDeviceList] = useState(false);
 
-  const handleConnect = () => {
-    // Mock connection flow
-    setConnectionStatus('scanning');
+  const handleConnect = async () => {
+    await startScan();
+    if (state.devices.length > 0 || state.isScanning) {
+      setShowDeviceList(true);
+    }
+  };
+
+  const handleDeviceSelect = async (device: StrippedDevice) => {
+    setShowDeviceList(false);
+    await connect(device);
+  };
+
+  const handleDisconnect = async () => {
+    await disconnect();
+  };
+
+  const formatBytes = (bytes: number): string => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+  };
+
+  const formatDuration = (timestamp: number | null): string => {
+    if (!timestamp) return '--';
+    const duration = Date.now() - timestamp;
+    const seconds = Math.floor(duration / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
     
-    setTimeout(() => {
-      setConnectionStatus('connecting');
-      setTimeout(() => {
-        setConnectionStatus('connected');
-      }, 1500);
-    }, 2000);
+    if (hours > 0) return `${hours}h ${minutes % 60}m`;
+    if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
+    return `${seconds}s`;
   };
 
-  const handleDisconnect = () => {
-    setConnectionStatus('disconnected');
-  };
+  const convertToStrippedDevice = (device: any): StrippedDevice => ({
+    name: device.name || 'Unknown Device',
+    address: device.address,
+    id: device.id,
+    bonded: Boolean(device.bonded),
+  });
 
   const renderConnectionButton = () => {
-    switch (connectionStatus) {
+    switch (state.status) {
       case 'disconnected':
         return (
           <TouchableOpacity style={styles.connectButton} onPress={handleConnect}>
@@ -41,7 +69,7 @@ export default function HomeScreen() {
         return (
           <View style={[styles.connectButton, styles.connectButtonDisabled]}>
             <ActivityIndicator size="small" color="#ffffff" />
-            <Text style={styles.connectButtonText}>Procurando dispositivo...</Text>
+            <Text style={styles.connectButtonText}>Procurando dispositivos...</Text>
           </View>
         );
       
@@ -92,23 +120,60 @@ export default function HomeScreen() {
           <View style={styles.statusHeader}>
             <View style={[
               styles.statusIndicator,
-              connectionStatus === 'connected' && styles.statusIndicatorConnected
+              state.status === 'connected' && styles.statusIndicatorConnected
             ]} />
             <Text style={styles.statusText}>
-              {connectionStatus === 'connected' ? 'Conectado' : 'Desconectado'}
+              {state.status === 'connected' ? 'Conectado' : 'Desconectado'}
             </Text>
           </View>
 
-          {connectionStatus === 'connected' && (
+          {state.status === 'connected' && state.connectedDevice && (
             <View style={styles.deviceInfo}>
               <Ionicons name="hardware-chip-outline" size={20} color={Colors.light.textSecondary} />
-              <Text style={styles.deviceName}>Collab Drive Controller</Text>
+              <Text style={styles.deviceName}>
+                {state.connectedDevice.name || 'Dispositivo Bluetooth'}
+              </Text>
             </View>
           )}
         </View>
 
         {/* Connection Button */}
         {renderConnectionButton()}
+
+        {/* Statistics Section - Show when connected */}
+        {state.status === 'connected' && (
+          <View style={styles.statsSection}>
+            <Text style={styles.statsSectionTitle}>Estatísticas da Conexão</Text>
+            
+            <View style={styles.statsGrid}>
+              <View style={styles.statCard}>
+                <Ionicons name="time-outline" size={24} color={Colors.light.primary} />
+                <Text style={styles.statValue}>{formatDuration(state.stats.connectionTime)}</Text>
+                <Text style={styles.statLabel}>Tempo Conectado</Text>
+              </View>
+
+              <View style={styles.statCard}>
+                <Ionicons name="send-outline" size={24} color={Colors.light.primary} />
+                <Text style={styles.statValue}>{state.stats.commandsSent}</Text>
+                <Text style={styles.statLabel}>Comandos Enviados</Text>
+              </View>
+
+              <View style={styles.statCard}>
+                <Ionicons name="cloud-upload-outline" size={24} color={Colors.light.primary} />
+                <Text style={styles.statValue}>{formatBytes(state.stats.bytesSent)}</Text>
+                <Text style={styles.statLabel}>Dados Enviados</Text>
+              </View>
+
+              <View style={styles.statCard}>
+                <Ionicons name="flash-outline" size={24} color={Colors.light.primary} />
+                <Text style={styles.statValue}>
+                  {state.stats.lastCommandAt ? 'Ativo' : 'Parado'}
+                </Text>
+                <Text style={styles.statLabel}>Status de Envio</Text>
+              </View>
+            </View>
+          </View>
+        )}
 
         {/* Instructions */}
         <View style={styles.instructionsSection}>
@@ -142,6 +207,75 @@ export default function HomeScreen() {
           </View>
         </View>
       </View>
+
+      {/* Device Selection Modal */}
+      <Modal
+        visible={showDeviceList}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowDeviceList(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Selecione um Dispositivo</Text>
+            <TouchableOpacity
+              onPress={() => setShowDeviceList(false)}
+              style={styles.modalCloseButton}
+            >
+              <Ionicons name="close" size={24} color={Colors.light.text} />
+            </TouchableOpacity>
+          </View>
+
+          {state.isScanning ? (
+            <View style={styles.modalLoading}>
+              <ActivityIndicator size="large" color={Colors.light.primary} />
+              <Text style={styles.modalLoadingText}>Procurando dispositivos...</Text>
+            </View>
+          ) : state.devices.length === 0 ? (
+            <View style={styles.modalEmpty}>
+              <Ionicons name="bluetooth-outline" size={64} color={Colors.light.textMuted} />
+              <Text style={styles.modalEmptyText}>Nenhum dispositivo encontrado</Text>
+              <TouchableOpacity style={styles.rescanButton} onPress={handleConnect}>
+                <Ionicons name="refresh" size={20} color="#ffffff" />
+                <Text style={styles.rescanButtonText}>Buscar Novamente</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <FlatList
+              data={state.devices}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.deviceList}
+              renderItem={({ item }) => {
+                const stripped = convertToStrippedDevice(item);
+                return (
+                  <TouchableOpacity
+                    style={styles.deviceItem}
+                    onPress={() => handleDeviceSelect(stripped)}
+                  >
+                    <View style={styles.deviceItemIcon}>
+                      <Ionicons 
+                        name={stripped.bonded ? "bluetooth" : "bluetooth-outline"} 
+                        size={24} 
+                        color={Colors.light.primary} 
+                      />
+                    </View>
+                    <View style={styles.deviceItemInfo}>
+                      <Text style={styles.deviceItemName}>
+                        {stripped.name || 'Dispositivo Desconhecido'}
+                      </Text>
+                      <Text style={styles.deviceItemAddress}>{stripped.address}</Text>
+                      {stripped.bonded && (
+                        <Text style={styles.deviceItemBonded}>Pareado</Text>
+                      )}
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color={Colors.light.textMuted} />
+                  </TouchableOpacity>
+                );
+              }}
+            />
+          )}
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -286,15 +420,111 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     paddingTop: 2,
   },
-  infoCards: {
+  statsSection: {
+    marginTop: 24,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: Colors.light.border,
+  },
+  statsSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.light.text,
+    marginBottom: 16,
+  },
+  statsGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 12,
   },
-  infoCard: {
+  statCard: {
     flex: 1,
-    backgroundColor: Colors.light.backgroundCard,
+    minWidth: '45%',
+    backgroundColor: Colors.light.background,
     borderRadius: 12,
     padding: 16,
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: Colors.light.text,
+    marginTop: 8,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: Colors.light.textSecondary,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: Colors.light.background,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.light.border,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: Colors.light.text,
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalLoading: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalLoadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: Colors.light.textSecondary,
+  },
+  modalEmpty: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  modalEmptyText: {
+    fontSize: 16,
+    color: Colors.light.textSecondary,
+    marginTop: 16,
+    marginBottom: 24,
+  },
+  rescanButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.light.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    gap: 8,
+  },
+  rescanButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  deviceList: {
+    padding: 16,
+  },
+  deviceItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.light.backgroundCard,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -307,18 +537,32 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  infoCardIcon: {
-    marginBottom: 12,
+  deviceItemIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: Colors.light.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
   },
-  infoCardTitle: {
-    fontSize: 14,
+  deviceItemInfo: {
+    flex: 1,
+  },
+  deviceItemName: {
+    fontSize: 16,
     fontWeight: '600',
     color: Colors.light.text,
     marginBottom: 4,
   },
-  infoCardText: {
+  deviceItemAddress: {
     fontSize: 12,
     color: Colors.light.textSecondary,
-    lineHeight: 16,
+    marginBottom: 2,
+  },
+  deviceItemBonded: {
+    fontSize: 11,
+    color: Colors.light.primary,
+    fontWeight: '500',
   },
 });

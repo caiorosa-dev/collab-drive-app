@@ -47,6 +47,13 @@
             "backgroundColor": "#fafafa"
           }
         }
+      ],
+      [
+        "with-rn-bluetooth-classic",
+        {
+          "peripheralUsageDescription": "Allow gyroscope car controler to check bluetooth peripheral info",
+          "alwaysUsageDescription": "Allow gyroscope car controler to always use bluetooth info"
+        }
       ]
     ],
     "experiments": {
