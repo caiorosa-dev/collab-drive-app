@@ -1,29 +1,87 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * Collab Drive App Theme
+ * Modern light interface with zinc palette and blue accents
  */
 
 import { Platform } from 'react-native';
 
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
+// Zinc Palette (Light mode focus)
+export const zinc = {
+  50: '#fafafa',
+  100: '#f4f4f5',
+  200: '#e4e4e7',
+  300: '#d4d4d8',
+  400: '#a1a1aa',
+  500: '#71717a',
+  600: '#52525b',
+  700: '#3f3f46',
+  800: '#27272a',
+  900: '#18181b',
+};
+
+// Blue Accents
+export const blue = {
+  400: '#60a5fa',
+  500: '#3b82f6',
+  600: '#2563eb',
+  700: '#1d4ed8',
+};
+
+// Status Colors
+export const status = {
+  success: '#10b981',
+  warning: '#f59e0b',
+  danger: '#ef4444',
+  info: '#3b82f6',
+};
 
 export const Colors = {
   light: {
-    text: '#11181C',
-    background: '#fff',
-    tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
+    // Backgrounds
+    background: zinc[50],
+    backgroundSecondary: '#ffffff',
+    backgroundCard: '#ffffff',
+    
+    // Text
+    text: zinc[900],
+    textSecondary: zinc[600],
+    textMuted: zinc[500],
+    
+    // Primary (Blue)
+    primary: blue[500],
+    primaryHover: blue[600],
+    primaryText: '#ffffff',
+    
+    // Borders & Dividers
+    border: zinc[200],
+    borderLight: zinc[100],
+    
+    // Icons
+    icon: zinc[600],
+    iconMuted: zinc[400],
+    
+    // Status
+    success: status.success,
+    warning: status.warning,
+    danger: status.danger,
+    info: status.info,
+    
+    // Tabs
+    tint: blue[500],
+    tabIconDefault: zinc[400],
+    tabIconSelected: blue[500],
+    
+    // Shadows
+    shadow: 'rgba(0, 0, 0, 0.1)',
   },
   dark: {
+    // Keep for future dark mode support
     text: '#ECEDEE',
     background: '#151718',
-    tint: tintColorDark,
+    tint: '#fff',
     icon: '#9BA1A6',
     tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
+    tabIconSelected: '#fff',
   },
 };
 
