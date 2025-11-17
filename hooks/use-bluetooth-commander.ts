@@ -40,7 +40,7 @@ export function useBluetoothCommander(
         sendCommand(currentCommand);
         commandRef.current = currentCommand;
       }
-    }, 100);
+    }, 50);
 
     return () => {
       if (intervalRef.current) {

@@ -1,5 +1,5 @@
 import { BluetoothState, BluetoothStats, CarCommand, ConnectionStatus, StrippedDevice } from '@/types/bluetooth';
-import { requestAccessFineLocationPermission } from '@/utils/android-permissions';
+import { requestAccessFineLocationPermission, requestBluetoothPermissions } from '@/utils/android-permissions';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Platform } from 'react-native';
 import RNBluetoothClassic, {
@@ -51,7 +51,7 @@ export function useBluetooth(): UseBluetoothReturn {
           );
           return;
         }
-
+        
         // Set up event listeners
         subscriptions.push(
           RNBluetoothClassic.onBluetoothEnabled(() => {
@@ -159,6 +159,17 @@ export function useBluetooth(): UseBluetoothReturn {
         }
       }
 
+      if (Platform.OS === 'android') {
+        const granted = await requestBluetoothPermissions();
+        if (!granted) {
+          Alert.alert(
+            'Permissão Necessária',
+            'Permissão de Bluetooth é necessária para descoberta Bluetooth.'
+          );
+          return;
+        }
+      }
+
       setIsScanning(true);
       setStatus('scanning');
       console.debug('[Bluetooth] Starting discovery...');
@@ -253,18 +264,32 @@ export function useBluetooth(): UseBluetoothReturn {
         return true;
       }
 
-      // Format command: "T<throttle>:S<angle>\n"
-      // Example: "T75:S90\n" (throttle 75%, steering 90°)
-      const commandStr = `T${command.throttle}:S${command.steeringAngle}\n`;
+      // Determine direction sign (- for reverse, + for forward)
+      const directionSign = command.throttle < 0 ? '-' : '+';
+      
+      // Get absolute throttle value and pad to 3 digits (000-100)
+      const throttleValue = Math.abs(command.throttle).toString().padStart(3, '0');
+      
+      // Pad steering angle to 3 digits (000-180)
+      const steeringValue = command.steeringAngle.toString().padStart(3, '0');
 
-      console.debug(`[Bluetooth] Sending command: ${commandStr.trim()}`);
-      const written = await connectedDevice.write(commandStr);
+      // Format commands:
+      // Acceleration: A(- or +)(000-100)
+      // Direction: D(000-180)
+      const accelerationCmd = `A${directionSign}${throttleValue}`;
+      const directionCmd = `D${steeringValue}`;
+
+      console.debug(`[Bluetooth] Sending commands: ${accelerationCmd}, ${directionCmd}`);
+      
+      // Send both commands
+      const written1 = await connectedDevice.write(accelerationCmd + '\n');
+      const written2 = await connectedDevice.write(directionCmd + '\n');
 
       lastCommandRef.current = command;
       setStats((prev) => ({
         ...prev,
-        bytesSent: prev.bytesSent + written,
-        commandsSent: prev.commandsSent + 1,
+        bytesSent: prev.bytesSent + written1 + written2,
+        commandsSent: prev.commandsSent + 2,
         lastCommandAt: Date.now(),
       }));
 
